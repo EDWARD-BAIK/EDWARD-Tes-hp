@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Test hp</title>
+    <title>Test HP Brutal</title>
     <header>@EdwardNst</header>
     <style>
         * {
@@ -23,7 +23,6 @@
             overflow: hidden; 
         }
 
-        
         .hud-panel {
             position: fixed;
             top: 15px;
@@ -51,7 +50,7 @@
         }
 
         .stats-info {
-            font-size: 1rem;
+            font-size: 1.2rem;
             color: #ffcccc;
             text-align: center;
             font-weight: bold;
@@ -98,7 +97,26 @@
             color: white;
         }
 
-        /* Canvas Area */
+        
+        .shake {
+            animation: shake 0.1s infinite;
+        }
+
+        @keyframes shake {
+            0% { transform: translate(2px, 1px) rotate(0deg); }
+            10% { transform: translate(-1px, -2px) rotate(-1deg); }
+            20% { transform: translate(-3px, 0px) rotate(1deg); }
+            30% { transform: translate(0px, 2px) rotate(0deg); }
+            40% { transform: translate(1px, -1px) rotate(1deg); }
+            50% { transform: translate(-1px, 2px) rotate(-1deg); }
+            60% { transform: translate(-3px, 1px) rotate(0deg); }
+            70% { transform: translate(2px, 1px) rotate(-1deg); }
+            80% { transform: translate(-1px, -1px) rotate(1deg); }
+            90% { transform: translate(2px, 2px) rotate(0deg); }
+            100% { transform: translate(1px, -2px) rotate(-1deg); }
+        }
+
+       
         canvas {
             position: absolute;
             top: 0;
@@ -114,11 +132,11 @@
     <div class="hud-panel">
         <div id="fps" class="fps-counter">0 FPS</div>
         <div class="stats-info">
-            Partikel: <span id="particle-count">0</span> | RAM Bloat: <span id="ram-count">0</span> MB
+            Partikel: <span id="particle-count">0</span>
         </div>
         <div class="controls">
-            <button class="btn-normal" onclick="startTest('normal')">Test brutal</button>
-            <button class="btn-nuke" onclick="startTest('nuke')">test biasa</button>
+            <button class="btn-normal" onclick="startTest('normal')">Test Brutal</button>
+            <button class="btn-nuke" onclick="startTest('nuke')">Test Paling Brutal</button>
             <button class="btn-stop" onclick="stopTest()">Hentikan Test</button>
         </div>
     </div>
@@ -130,21 +148,63 @@
         const ctx = canvas.getContext('2d');
         const fpsDisplay = document.getElementById('fps');
         const countDisplay = document.getElementById('particle-count');
-        const ramDisplay = document.getElementById('ram-count');
 
         let width = canvas.width = window.innerWidth;
         let height = canvas.height = window.innerHeight;
 
-        
         let frameCount = 0;
         let lastTime = performance.now();
         let fps = 0;
 
-        
-        let testMode = 'none'; // 'none', 'normal', 'nuke'
+        let testMode = 'none'; 
         let particles = [];
         let memoryLeak = []; 
-        let mbCount = 0;
+
+        
+        let audioCtx;
+        let oscillator;
+        let gainNode;
+
+        function startBuzzer() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (oscillator) return; 
+
+            oscillator = audioCtx.createOscillator();
+            gainNode = audioCtx.createGain();
+
+          
+            oscillator.type = 'sawtooth';
+            
+            oscillator.frequency.setValueAtTime(65, audioCtx.currentTime);
+
+           
+            const lfo = audioCtx.createOscillator();
+            lfo.type = 'sine';
+            lfo.frequency.setValueAtTime(20, audioCtx.currentTime); 
+            const lfoGain = audioCtx.createGain();
+            lfoGain.gain.setValueAtTime(15, audioCtx.currentTime); 
+            
+            lfo.connect(lfoGain);
+            lfoGain.connect(oscillator.frequency);
+            lfo.start();
+
+            
+            gainNode.gain.setValueAtTime(0.5, audioCtx.currentTime);
+
+            oscillator.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            oscillator.start();
+        }
+
+        function stopBuzzer() {
+            if (oscillator) {
+                oscillator.stop();
+                oscillator.disconnect();
+                oscillator = null;
+            }
+        }
 
         function updateFPS() {
             const now = performance.now();
@@ -173,10 +233,10 @@
             constructor() {
                 this.x = Math.random() * width;
                 this.y = Math.random() * height;
-                this.vx = (Math.random() - 0.5) * 10;
-                this.vy = (Math.random() - 0.5) * 10;
-                this.radius = Math.random() * 20;
-                this.color = `rgba(${Math.random()*255}, ${Math.random()*255}, ${Math.random()*255}, 0.8)`;
+                this.vx = (Math.random() - 0.5) * 15;
+                this.vy = (Math.random() - 0.5) * 15;
+                this.radius = Math.random() * 30;
+                this.color = `rgba(${Math.random()*255}, ${Math.random()*100}, 0, 0.9)`;
             }
 
             update() {
@@ -185,15 +245,14 @@
 
                 
                 let heavyMath = 0;
-                for (let i = 0; i < 50; i++) {
+                for (let i = 0; i < 200; i++) {
                     heavyMath += Math.sqrt(Math.abs(Math.sin(this.x) * Math.cos(this.y) * Math.log(this.radius + i)));
                 }
 
-                
                 ctx.beginPath();
                 ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
                 ctx.fillStyle = this.color;
-                ctx.shadowBlur = 20; 
+                ctx.shadowBlur = 30; 
                 ctx.shadowColor = this.color;
                 ctx.fill();
             }
@@ -201,8 +260,11 @@
 
         function startTest(mode) {
             testMode = mode;
+            startBuzzer();
+            document.body.classList.add('shake'); 
+
             if (mode === 'normal') {
-                for (let i = 0; i < 10000; i++) {
+                for (let i = 0; i < 15000; i++) {
                     particles.push(new DeathParticle());
                 }
                 countDisplay.textContent = particles.length;
@@ -213,34 +275,33 @@
             testMode = 'none';
             particles = [];
             memoryLeak = [];
-            mbCount = 0;
             countDisplay.textContent = 0;
-            ramDisplay.textContent = 0;
             ctx.clearRect(0, 0, width, height);
+            
             fpsDisplay.style.color = '#00ff66';
             fpsDisplay.textContent = 'STOP';
+            
+            stopBuzzer();
+            document.body.classList.remove('shake'); 
         }
 
-        
         function loop() {
             updateFPS();
 
             if (testMode !== 'none') {
-                ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
                 ctx.fillRect(0, 0, width, height);
 
-                
                 if (testMode === 'nuke') {
-                    
-                    for (let i = 0; i < 500; i++) {
+                    (3000 per frame)
+                    for (let i = 0; i < 3000; i++) {
                         particles.push(new DeathParticle());
                     }
                     
-                    memoryLeak.push(new Array(1024 * 1024).join('☠️'));
-                    mbCount++;
+                    
+                    memoryLeak.push(new Array(1024 * 1024 * 2).join('☠️'));
                     
                     countDisplay.textContent = particles.length;
-                    ramDisplay.textContent = mbCount; // Menampilkan perkiraan MB yang dimakan
                 }
 
                 for (let i = 0; i < particles.length; i++) {
@@ -250,9 +311,13 @@
                 ctx.clearRect(0, 0, width, height);
             }
 
-            
             requestAnimationFrame(loop);
         }
+
+        window.addEventListener('resize', () => {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+        });
 
         loop();
     </script>
