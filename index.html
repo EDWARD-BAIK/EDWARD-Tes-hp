@@ -3,43 +3,102 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Test HP Brutal</title>
+    <title>Test hp</title>
+    <header>@EdwardNst</header>
     <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: sans-serif; }
-        body { background-color: #000; color: #fff; min-height: 100vh; overflow: hidden; display: flex; flex-direction: column; align-items: center; }
-
-        .hud-panel {
-            position: fixed;
-            top: 20px;
-            background: rgba(20, 20, 20, 0.95);
-            border: 2px solid #444;
-            border-radius: 12px;
-            padding: 20px;
-            z-index: 9999;
-            width: 90%;
-            max-width: 400px;
-            text-align: center;
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
 
-        .fps-counter { font-size: 2.5rem; font-weight: 900; color: #00ff66; margin-bottom: 10px; }
+        body {
+            background-color: #000000;
+            color: #ffffff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            overflow: hidden; 
+        }
+
         
+        .hud-panel {
+            position: fixed;
+            top: 15px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(20, 20, 20, 0.9);
+            border: 2px solid #333;
+            border-radius: 12px;
+            padding: 15px 25px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+            z-index: 9999;
+            box-shadow: 0 4px 30px rgba(255, 0, 0, 0.2);
+            width: 95%;
+            max-width: 450px;
+        }
+
+        .fps-counter {
+            font-size: 3rem;
+            font-weight: 900;
+            color: #00ff66;
+            text-shadow: 0 0 15px rgba(0, 255, 102, 0.7);
+        }
+
+        .stats-info {
+            font-size: 1rem;
+            color: #ffcccc;
+            text-align: center;
+            font-weight: bold;
+        }
+
+        .controls {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            width: 100%;
+        }
+
         button {
             width: 100%;
-            padding: 15px;
-            margin-top: 10px;
+            padding: 12px;
             border: none;
             border-radius: 6px;
             font-weight: bold;
             font-size: 1rem;
             cursor: pointer;
+            transition: 0.2s;
             text-transform: uppercase;
         }
 
-        .btn-normal { background-color: #f39c12; color: white; }
-        .btn-nuke { background-color: #c0392b; color: white; }
-        .btn-stop { background-color: #27ae60; color: white; }
+        .btn-normal {
+            background-color: #f39c12;
+            color: white;
+        }
 
-        /* KUNCI PERBAIKAN: pointer-events: none agar canvas tidak menghalangi sentuhan */
+        .btn-nuke {
+            background-color: #c0392b;
+            color: white;
+            box-shadow: 0 0 15px rgba(192, 57, 43, 0.8);
+            animation: pulse 1s infinite alternate;
+        }
+
+        @keyframes pulse {
+            from { transform: scale(1); }
+            to { transform: scale(1.02); }
+        }
+
+        .btn-stop {
+            background-color: #27ae60;
+            color: white;
+        }
+
+        /* Canvas Area */
         canvas {
             position: absolute;
             top: 0;
@@ -47,7 +106,6 @@
             width: 100vw;
             height: 100vh;
             z-index: 1;
-            pointer-events: none; 
         }
     </style>
 </head>
@@ -55,10 +113,14 @@
 
     <div class="hud-panel">
         <div id="fps" class="fps-counter">0 FPS</div>
-        <div>Partikel: <span id="particle-count">0</span></div>
-        <button class="btn-normal" onclick="startTest('normal')">Test Brutal</button>
-        <button class="btn-nuke" onclick="startTest('nuke')">Test Paling Brutal</button>
-        <button class="btn-stop" onclick="stopTest()">Hentikan Test</button>
+        <div class="stats-info">
+            Partikel: <span id="particle-count">0</span> | RAM Bloat: <span id="ram-count">0</span> MB
+        </div>
+        <div class="controls">
+            <button class="btn-normal" onclick="startTest('normal')">Test brutal</button>
+            <button class="btn-nuke" onclick="startTest('nuke')">test biasa</button>
+            <button class="btn-stop" onclick="stopTest()">Hentikan Test</button>
+        </div>
     </div>
 
     <canvas id="canvas"></canvas>
@@ -68,83 +130,130 @@
         const ctx = canvas.getContext('2d');
         const fpsDisplay = document.getElementById('fps');
         const countDisplay = document.getElementById('particle-count');
+        const ramDisplay = document.getElementById('ram-count');
 
         let width = canvas.width = window.innerWidth;
         let height = canvas.height = window.innerHeight;
+
+        
+        let frameCount = 0;
+        let lastTime = performance.now();
+        let fps = 0;
+
+        
+        let testMode = 'none'; // 'none', 'normal', 'nuke'
         let particles = [];
-        let testMode = 'none';
-        let audioCtx, oscillator, gainNode;
+        let memoryLeak = []; 
+        let mbCount = 0;
 
-        function startAudio() {
-            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            
-            // Resume audio jika browser memblokir auto-play
-            if (audioCtx.state === 'suspended') audioCtx.resume();
-            
-            if (oscillator) return;
+        function updateFPS() {
+            const now = performance.now();
+            frameCount++;
+            if (now - lastTime >= 1000) {
+                fps = Math.round((frameCount * 1000) / (now - lastTime));
+                fpsDisplay.textContent = fps + ' FPS';
 
-            oscillator = audioCtx.createOscillator();
-            gainNode = audioCtx.createGain();
-            oscillator.type = 'sawtooth';
-            oscillator.frequency.setValueAtTime(60, audioCtx.currentTime);
-            gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
-            oscillator.connect(gainNode);
-            gainNode.connect(audioCtx.destination);
-            oscillator.start();
-        }
+                if (fps > 45) {
+                    fpsDisplay.style.color = '#00ff66';
+                    fpsDisplay.style.textShadow = '0 0 15px rgba(0,255,102,0.7)';
+                } else if (fps > 15) {
+                    fpsDisplay.style.color = '#f39c12';
+                    fpsDisplay.style.textShadow = '0 0 15px rgba(243,156,18,0.7)';
+                } else {
+                    fpsDisplay.style.color = '#ff0000';
+                    fpsDisplay.style.textShadow = '0 0 20px rgba(255,0,0,1)';
+                }
 
-        function stopAudio() {
-            if (oscillator) {
-                oscillator.stop();
-                oscillator = null;
+                frameCount = 0;
+                lastTime = now;
             }
         }
 
-        class Particle {
+        class DeathParticle {
             constructor() {
                 this.x = Math.random() * width;
                 this.y = Math.random() * height;
-                this.vx = (Math.random() - 0.5) * 20;
-                this.vy = (Math.random() - 0.5) * 20;
+                this.vx = (Math.random() - 0.5) * 10;
+                this.vy = (Math.random() - 0.5) * 10;
+                this.radius = Math.random() * 20;
+                this.color = `rgba(${Math.random()*255}, ${Math.random()*255}, ${Math.random()*255}, 0.8)`;
             }
+
             update() {
-                this.x += this.vx; this.y += this.vy;
-                ctx.fillStyle = 'white';
-                ctx.fillRect(this.x, this.y, 2, 2);
+                this.x += this.vx;
+                this.y += this.vy;
+
+                
+                let heavyMath = 0;
+                for (let i = 0; i < 50; i++) {
+                    heavyMath += Math.sqrt(Math.abs(Math.sin(this.x) * Math.cos(this.y) * Math.log(this.radius + i)));
+                }
+
+                
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fillStyle = this.color;
+                ctx.shadowBlur = 20; 
+                ctx.shadowColor = this.color;
+                ctx.fill();
             }
         }
 
         function startTest(mode) {
             testMode = mode;
-            particles = [];
-            startAudio();
+            if (mode === 'normal') {
+                for (let i = 0; i < 10000; i++) {
+                    particles.push(new DeathParticle());
+                }
+                countDisplay.textContent = particles.length;
+            }
         }
 
         function stopTest() {
             testMode = 'none';
             particles = [];
-            stopAudio();
-            ctx.clearRect(0, 0, width, height);
+            memoryLeak = [];
+            mbCount = 0;
             countDisplay.textContent = 0;
+            ramDisplay.textContent = 0;
+            ctx.clearRect(0, 0, width, height);
+            fpsDisplay.style.color = '#00ff66';
             fpsDisplay.textContent = 'STOP';
         }
 
+        
         function loop() {
+            updateFPS();
+
             if (testMode !== 'none') {
-                ctx.fillStyle = 'rgba(0,0,0,0.2)';
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
                 ctx.fillRect(0, 0, width, height);
+
                 
-                // Tambah partikel lebih banyak
-                for(let i=0; i < (testMode === 'nuke' ? 500 : 100); i++) {
-                    particles.push(new Particle());
+                if (testMode === 'nuke') {
+                    
+                    for (let i = 0; i < 500; i++) {
+                        particles.push(new DeathParticle());
+                    }
+                    
+                    memoryLeak.push(new Array(1024 * 1024).join('☠️'));
+                    mbCount++;
+                    
+                    countDisplay.textContent = particles.length;
+                    ramDisplay.textContent = mbCount; // Menampilkan perkiraan MB yang dimakan
                 }
-                
-                particles.forEach(p => p.update());
-                countDisplay.textContent = particles.length;
-                fpsDisplay.textContent = Math.round(1000 / 16) + ' FPS'; // Simulasi FPS
+
+                for (let i = 0; i < particles.length; i++) {
+                    particles[i].update();
+                }
+            } else {
+                ctx.clearRect(0, 0, width, height);
             }
+
+            
             requestAnimationFrame(loop);
         }
+
         loop();
     </script>
 </body>
